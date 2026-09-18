@@ -1,0 +1,55 @@
+[package]
+name = "lyrebird-rs"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.85"
+license = "GPL-3.0-or-later"
+description = "Rust port of lyrebird, the Tor Project's pluggable transport suite"
+publish = false
+
+[lib]
+name = "lyrebird"
+path = "src/lib.rs"
+
+[[bin]]
+name = "lyrebird"
+path = "src/main.rs"
+
+[dependencies]
+base64 = "0.22"
+chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
+crypto_secretbox = "0.1"
+curve25519-dalek = { version = "4.1", default-features = false, features = ["alloc", "precomputed-tables", "zeroize"] }
+fiat-crypto = "0.2"
+flate2 = { version = "1", default-features = false, features = ["rust_backend"] }
+getrandom = "0.2"
+hex = "0.4"
+hkdf = "0.12"
+hmac = "0.12"
+idna = "1"
+percent-encoding = "2"
+rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12", "logging"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = { version = "1", features = ["float_roundtrip"] }
+sha2 = "0.10"
+siphasher = "1"
+str0m = { version = "0.23", default-features = false, features = ["rust-crypto"] }
+subtle = "2.5"
+thiserror = "2"
+tokio-rustls = { version = "0.26", default-features = false, features = ["ring", "tls12", "logging"] }
+tokio = { version = "1", features = ["rt-multi-thread", "net", "io-util", "io-std", "time", "sync", "signal", "macros"] }
+url = "2"
+webpki-roots = "1"
+zeroize = "1"
+
+[target.'cfg(target_os = "linux")'.dependencies]
+rustix = { version = "1", features = ["process"] }
+
+[profile.release]
+lto = "thin"
+codegen-units = 1
+
+[dev-dependencies]
+rcgen = { version = "0.14.7", default-features = false, features = ["ring"] }
+tempfile = "3"
+tokio = { version = "1", features = ["process"] }
