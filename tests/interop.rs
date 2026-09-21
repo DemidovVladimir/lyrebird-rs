@@ -6,8 +6,8 @@ use std::net::SocketAddr;
 use std::process::Stdio;
 use std::time::Duration;
 
-use lyrebird::common::drbg::Seed;
-use lyrebird::common::probdist::WeightedDist;
+use lyrebird::shared::domain::crypto::drbg::Seed;
+use lyrebird::shared::domain::crypto::probdist::WeightedDist;
 use tokio::io::{AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader};
 use tokio::net::{TcpListener, TcpStream};
 use tokio::process::{Child, Command};
