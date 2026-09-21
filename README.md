@@ -38,6 +38,7 @@ run_on_startup = true
 | Suite | Command | Needs |
 |---|---|---|
 | Unit + recorded vectors | `cargo test --lib` | — |
+| Architecture rules (layer dependencies) | `cargo test --test architecture` | — |
 | obfs4 through the binary (as client and as server, iat-mode 0/1/2, paranoid-mode recovery, wire shape follows the bridge's length table) | `cargo test --release --test interop` | — |
 | webtunnel through the binary (pt-spec env + SOCKS args, in-process HTTP upgrade server, errors reported to tor) | `cargo test --test webtunnel` | — |
 | Arti end to end | `tools/arti-e2e/run.sh [obfs4\|snowflake\|webtunnel]` | Docker, network access to Tor bridges |
@@ -72,16 +73,45 @@ Tor Browser's bundle has no built-in webtunnel bridges; `tools/arti-e2e/bridges.
 
 ## Layout
 
+Hexagonal ("ports and adapters"): logic sits in `domain`, talks to the outside world only through the traits in `ports`, and `adapters` implement those traits with real sockets, files, TLS and WebRTC. Every transport is its own hexagon; `shared` holds what the application and all transports use. `src/main.rs` is the composition root that plugs adapters into ports.
+
+```
+src/
+  main.rs                 composition root: flags, adapters, app::run
+  app/                    use cases, ports only: client mode, server mode,
+                          relay (copy loop), shutdown, transport registry
+  shared/
+    domain/               crypto/, pt/ (args, control lines, managed env),
+                          proxy (TOR_PT_PROXY rules), http (codec), scrub
+    ports/                transport, stream, dialer, log, control, env, net,
+                          socks, orport, storage, signals
+    adapters/             tcp, proxy dialers, socks5 server, extorport,
+                          stdout, process_env, fs, signals, httpc, cli
+  transports/
+    obfs4/      domain/   framing, handshake, packet, conn, client, server, state
+                ports/    state_store (BridgeStateStore)
+                adapters/ fs_state_store (obfs4_state.json, obfs4_bridgeline.txt)
+    snowflake/  domain/   broker, peer, client (pool + Turbo Tunnel), kcp,
+                          kcp_session, smux, turbotunnel, encapsulation, nat, config
+                ports/    rendezvous, webrtc, nat_probe
+                adapters/ rendezvous (HTTP, AMP cache), amp, sqs, webrtc (str0m), stun
+    webtunnel/  domain/   config (args, TLS policy), servername, upgrade
+                ports/    tls (TlsConnector)
+                adapters/ rustls
+```
+
+Dependency rules, enforced by `tests/architecture.rs`: `domain` and `ports` do no I/O themselves (no adapters, sockets, files, env, stdio, signals, rustls or str0m); `app` uses ports, never adapters; `shared` knows neither the app nor any transport; transports never depend on each other.
+
 | Path | Upstream |
 |---|---|
-| `src/main.rs` | `cmd/lyrebird` |
-| `src/pt/` | goptlib |
-| `src/socks5.rs`, `src/proxy.rs`, `src/log.rs`, `src/termmon.rs` | `common/socks5`, `cmd/lyrebird/proxy_*`, `common/log`, `cmd/lyrebird/termmon*` |
-| `src/common/` | `common/{csrand,drbg,ntor,probdist,replayfilter}`, `internal/x25519ell2`; `field.rs` and `gorand.rs` stand in for filippo.io/edwards25519 and Go `math/rand` |
+| `src/main.rs`, `src/app/` | `cmd/lyrebird` |
+| `src/shared/domain/pt/`, `src/shared/adapters/{stdout,process_env,extorport}.rs` | goptlib |
+| `src/shared/adapters/{socks5,proxy,signals}.rs`, `src/shared/ports/log.rs`, `src/app/termmon.rs` | `common/socks5`, `cmd/lyrebird/proxy_*`, `common/log`, `cmd/lyrebird/termmon*` |
+| `src/shared/domain/crypto/` | `common/{csrand,drbg,ntor,probdist,replayfilter}`, `internal/x25519ell2`; `field.rs` and `gorand.rs` stand in for filippo.io/edwards25519 and Go `math/rand` |
 | `src/transports/obfs4/` | `transports/obfs4` |
 | `src/transports/snowflake/` | `transports/snowflake` + snowflake `client/lib`, `common/{amp,encapsulation,event,messages,nat,sqscreds,turbotunnel}`, kcp-go (`kcp.rs`, `kcp_session.rs`), smux (`smux.rs`), a STUN client (`stun.rs`) and str0m glue (`webrtc.rs`) |
 | `src/transports/webtunnel/` | `transports/webtunnel` + webtunnel `transport/{httpupgrade,tls}`, `common/certiChainHashCalc` |
-| `src/common/httpc.rs` | the parts of Go `net/http` the HTTP-based transports use |
+| `src/shared/domain/http.rs`, `src/shared/adapters/httpc.rs` | the parts of Go `net/http` the HTTP-based transports use |
 
 ## License
 

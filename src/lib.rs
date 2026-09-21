@@ -2,20 +2,21 @@
 //! transport suite
 //! (<https://gitlab.torproject.org/tpo/anti-censorship/pluggable-transports/lyrebird>).
 //!
-//! Module map (upstream path in parentheses):
-//! - `pt` — pluggable transport spec v1 (goptlib)
-//! - `socks5` — tor-facing SOCKS server (common/socks5)
-//! - `proxy` — `TOR_PT_PROXY` dialers (cmd/lyrebird/proxy_*.go)
-//! - `transports` — transport interface and implementations (transports/)
-//! - `common` — crypto and randomness primitives (common/, internal/)
-//! - `log`, `termmon` — logging and shutdown (common/log, cmd/lyrebird/termmon*.go)
+//! Hexagonal layout:
+//! - `app` — use cases: client mode, server mode, relaying, shutdown. Talks
+//!   to the outside only through ports.
+//! - `shared::{domain, ports, adapters}` — what the application and every
+//!   transport share: crypto, the pt-spec, logging, streams and dialers,
+//!   and their implementations (TCP, proxies, SOCKS5, ExtORPort, stdout,
+//!   files, signals, HTTP).
+//! - `transports::{obfs4, snowflake, webtunnel}` — one hexagon per
+//!   transport, each with its own `domain`, `ports` and `adapters`.
+//! - `main.rs` — the composition root that wires adapters into ports.
+//!
+//! `tests/architecture.rs` checks the dependency rules.
 
-pub mod common;
-pub mod log;
-pub mod proxy;
-pub mod pt;
-pub mod socks5;
-pub mod termmon;
+pub mod app;
+pub mod shared;
 pub mod transports;
 
 /// This crate's version (reported to tor in the `STATUS TYPE=version` line).
