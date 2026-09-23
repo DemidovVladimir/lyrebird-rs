@@ -2,7 +2,8 @@
 //!
 //! - `domain` and `ports` do no I/O of their own: no adapters, no sockets,
 //!   files, environment, stdio, signals, TLS or WebRTC stacks.
-//! - `app` reaches the outside world only through ports.
+//! - `app` reaches the outside world only through ports: no adapters and
+//!   no I/O of its own.
 //! - `shared` does not know about the application or any transport.
 //! - A transport never reaches into another transport.
 //!
@@ -33,7 +34,19 @@ const IO: &[&str] = &[
     "str0m::",
 ];
 
-const TRANSPORTS: &[&str] = &["obfs4", "snowflake", "webtunnel"];
+/// Every directory under `src/transports/`, so a new transport is checked
+/// without editing this file.
+fn transports() -> Vec<String> {
+    let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("src/transports");
+    let mut names: Vec<String> = std::fs::read_dir(dir)
+        .unwrap()
+        .map(|e| e.unwrap().path())
+        .filter(|p| p.is_dir())
+        .map(|p| p.file_name().unwrap().to_string_lossy().into_owned())
+        .collect();
+    names.sort();
+    names
+}
 
 fn rust_files(dir: &Path, out: &mut Vec<PathBuf>) {
     for entry in std::fs::read_dir(dir).unwrap() {
@@ -58,6 +71,7 @@ fn production_code(path: &Path) -> String {
 
 fn violations() -> Vec<String> {
     let src = Path::new(env!("CARGO_MANIFEST_DIR")).join("src");
+    let transports = transports();
     let mut files = Vec::new();
     rust_files(&src, &mut files);
     files.sort();
@@ -82,7 +96,13 @@ fn violations() -> Vec<String> {
             }
         }
         if parts[0] == "app" {
-            forbid("adapters::", "the application uses ports, not adapters");
+            // `app::run` returns a `std::process::ExitCode`.
+            for p in IO
+                .iter()
+                .filter(|p| !["crate::app", "std::process"].contains(p))
+            {
+                forbid(p, "the application uses ports, not adapters or I/O");
+            }
         }
         if parts[0] == "shared" {
             forbid("crate::app", "shared code does not know the application");
@@ -94,7 +114,7 @@ fn violations() -> Vec<String> {
         if parts[0] == "transports" && parts.len() > 2 {
             let own = parts[1];
             forbid("crate::app", "transports do not know the application");
-            for other in TRANSPORTS.iter().filter(|t| **t != own) {
+            for other in transports.iter().filter(|t| *t != own) {
                 forbid(
                     &format!("transports::{other}"),
                     "transports are independent of each other",
@@ -114,7 +134,12 @@ fn layers_depend_inwards() {
 #[test]
 fn every_transport_is_a_hexagon() {
     let src = Path::new(env!("CARGO_MANIFEST_DIR")).join("src");
-    for t in TRANSPORTS {
+    let transports = transports();
+    assert!(
+        transports.len() >= 3,
+        "transports not found: {transports:?}"
+    );
+    for t in &transports {
         for layer in ["domain", "ports", "adapters"] {
             let dir = src.join("transports").join(t).join(layer);
             assert!(dir.join("mod.rs").is_file(), "missing {}", dir.display());

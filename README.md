@@ -73,6 +73,8 @@ Tor Browser's bundle has no built-in webtunnel bridges; `tools/arti-e2e/bridges.
 
 ## Layout
 
+Maps for finding your way: [`docs/FEATUREMAP.md`](docs/FEATUREMAP.md) (feature → code → tests, and how to add a transport, argument, flag or port) and [`docs/CODEMAP.md`](docs/CODEMAP.md) (every file and what it owns). [`AGENTS.md`](AGENTS.md) has the rules and commands for coding agents.
+
 Hexagonal ("ports and adapters"): logic sits in `domain`, talks to the outside world only through the traits in `ports`, and `adapters` implement those traits with real sockets, files, TLS and WebRTC. Every transport is its own hexagon; `shared` holds what the application and all transports use. `src/main.rs` is the composition root that plugs adapters into ports.
 
 ```
@@ -100,7 +102,7 @@ src/
                 adapters/ rustls
 ```
 
-Dependency rules, enforced by `tests/architecture.rs`: `domain` and `ports` do no I/O themselves (no adapters, sockets, files, env, stdio, signals, rustls or str0m); `app` uses ports, never adapters; `shared` knows neither the app nor any transport; transports never depend on each other.
+Dependency rules, enforced by `tests/architecture.rs`: `domain` and `ports` do no I/O themselves (no adapters, sockets, files, env, stdio, signals, rustls or str0m); `app` uses ports, never adapters or I/O of its own; `shared` knows neither the app nor any transport; transports never depend on each other or on `app`. The check lists `src/transports/` itself, so a new transport is covered automatically.
 
 | Path | Upstream |
 |---|---|
