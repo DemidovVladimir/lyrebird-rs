@@ -3,7 +3,7 @@
 
 //! Minimal HTTP/1.1 client (plain or rustls TLS) that writes requests the
 //! way Go's `net/http` Transport does, for the transports that talk to
-//! brokers and CDNs (snowflake rendezvous, meek_lite).
+//! brokers and CDNs (snowflake rendezvous; meek_lite once ported).
 //!
 //! Supported: one idle keep-alive connection per client, transparent gzip,
 //! response-header timeout, domain fronting (dial/SNI one name, `Host:`
